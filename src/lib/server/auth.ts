@@ -25,7 +25,7 @@ function getAuthSecret(): string {
 
 export function createAuth(options: { allowSignUp?: boolean } = {}) {
   return betterAuth({
-    appName: 'angefolio console',
+    appName: 'Gamon console',
     baseURL: getSiteOrigin(),
     secret: getAuthSecret(),
     trustedOrigins: getTrustedOrigins(),

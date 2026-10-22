@@ -16,9 +16,12 @@ export default defineConfig({
   site: siteUrl,
   output: 'server',
   security: {
+    // Render's TLS proxy makes Astro reconstruct a different request origin.
+    // Console mutations check the Origin header, and Better Auth checks its
+    // configured trusted origins before accepting authentication requests.
+    checkOrigin: false,
     allowedDomains: [
-      // Render terminates TLS before the request reaches Astro. Trust its
-      // forwarded HTTPS origin so same-site form posts pass Astro's CSRF check.
+      // Trust only the public host in Render's forwarded request headers.
       {
         hostname: siteOrigin.hostname,
         protocol: siteOrigin.protocol.slice(0, -1),
