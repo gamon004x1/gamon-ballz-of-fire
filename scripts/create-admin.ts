@@ -77,7 +77,7 @@ const bootstrapAuth = createAuth({ allowSignUp: true });
 
 await bootstrapAuth.api.signUpEmail({
   body: {
-    name: 'Angellie Marcos',
+    name: 'Gamon Sawada',
     email,
     password,
   },

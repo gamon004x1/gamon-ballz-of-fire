@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: angefolio
+    name: gamon-ballz-of-fire
     runtime: docker
     plan: free
     region: singapore
