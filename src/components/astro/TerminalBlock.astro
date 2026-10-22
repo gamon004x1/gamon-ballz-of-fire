@@ -1,0 +1,87 @@
+---
+interface Props {
+  title?: string;
+  class?: string;
+}
+const { title = 'gamon.sh', class: className = '' } = Astro.props;
+---
+
+<div
+  class:list={['terminal terminal-glow', className]}
+  role="region"
+  aria-label={`Terminal: ${title}`}
+>
+  <div class="bar" aria-hidden="true">
+    <i></i><i></i><i></i><strong>{title}</strong>
+  </div>
+  <div class="body"><span aria-hidden="true">$</span><div><slot /></div></div>
+</div>
+<style>
+  .terminal {
+    max-width: 100%;
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--border));
+    border-radius: var(--radius-lg);
+    background: var(--terminal-background);
+    color: var(--terminal-foreground);
+    font-family: var(--type-code);
+    font-variant-ligatures: none;
+    font-feature-settings:
+      'calt' 0,
+      'liga' 0;
+  }
+  .bar {
+    display: flex;
+    align-items: center;
+    gap: 0.36rem;
+    min-height: 2.15rem;
+    padding: 0.45rem 0.7rem;
+    border-bottom: 1px solid var(--border);
+  }
+  i {
+    width: 0.48rem;
+    height: 0.48rem;
+    border-radius: 50%;
+    background: color-mix(
+      in srgb,
+      var(--accent) 25%,
+      var(--terminal-background)
+    );
+  }
+  i:nth-child(2) {
+    background: var(--accent);
+  }
+  i:nth-child(3) {
+    background: var(--terminal-accent);
+  }
+  strong {
+    min-width: 0;
+    margin-left: 0.35rem;
+    overflow: hidden;
+    color: var(--terminal-muted);
+    font-size: 0.66rem;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .body {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.55rem;
+    padding: clamp(0.75rem, 3vw, 1rem);
+    font-size: clamp(0.7rem, 2vw, 0.78rem);
+  }
+  .body > span {
+    color: var(--terminal-accent);
+  }
+  .body > div {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .body :global(p) {
+    margin: 0.15rem 0;
+  }
+  .body :global(code) {
+    color: var(--terminal-accent);
+  }
+</style>

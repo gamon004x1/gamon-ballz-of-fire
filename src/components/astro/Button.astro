@@ -1,0 +1,102 @@
+---
+interface Props {
+  href: string;
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
+  size?: 'sm' | 'md' | 'lg';
+  external?: boolean;
+  class?: string;
+}
+const {
+  href,
+  variant = 'secondary',
+  size = 'md',
+  external = false,
+  class: className = '',
+} = Astro.props;
+---
+
+<a
+  class:list={['button', `variant-${variant}`, `size-${size}`, className]}
+  {href}
+  target={external ? '_blank' : undefined}
+  rel={external ? 'noopener noreferrer' : undefined}
+>
+  <slot />{
+    external && (
+      <>
+        <span aria-hidden="true">↗</span>
+        <span class="sr-only"> (opens in a new tab)</span>
+      </>
+    )
+  }
+</a>
+<style>
+  .button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    font-family: var(--type-ui);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    line-height: 1;
+    transition:
+      border-color 140ms ease,
+      background-color 140ms ease,
+      color 140ms ease;
+  }
+  .size-sm {
+    min-height: 2rem;
+    padding: 0.45rem 0.65rem;
+    font-size: 0.75rem;
+  }
+  .size-md {
+    min-height: 2.55rem;
+    padding: 0.65rem 0.9rem;
+    font-size: 0.875rem;
+  }
+  .size-lg {
+    min-height: 3rem;
+    padding: 0.8rem 1.1rem;
+    font-size: 0.95rem;
+  }
+  .variant-primary {
+    border-color: var(--primary-background);
+    background: var(--primary-background);
+    color: var(--primary-foreground);
+  }
+  .variant-secondary {
+    border-color: var(--border-strong);
+    background: var(--muted);
+    color: var(--foreground);
+  }
+  .variant-ghost {
+    border-color: transparent;
+    background: transparent;
+    color: var(--muted-foreground);
+  }
+  .variant-danger {
+    border-color: var(--danger);
+    background: var(--danger);
+    color: var(--danger-foreground);
+  }
+  .button:hover {
+    border-color: var(--border-strong);
+    color: var(--foreground);
+  }
+  .variant-primary:hover {
+    border-color: var(--accent-text);
+    background: var(--primary-background);
+    color: var(--primary-foreground);
+  }
+  .variant-ghost:hover {
+    background: var(--accent-soft);
+  }
+  .variant-danger:hover {
+    border-color: var(--danger-border);
+    background: color-mix(in srgb, var(--danger) 88%, var(--background));
+    color: var(--danger-foreground);
+  }
+</style>

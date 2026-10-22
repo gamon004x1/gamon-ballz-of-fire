@@ -1,0 +1,174 @@
+---
+import Button from './Button.astro';
+import CompactTagList from './CompactTagList.astro';
+import StatusPill from './StatusPill.astro';
+import Tag from './Tag.astro';
+import { getProjectActions } from '../../lib/data/cardPresentation';
+
+interface Props {
+  href?: string;
+  title: string;
+  description: string;
+  status: string;
+  stack: string[];
+  github?: string;
+  demo?: string;
+  caseStudy?: string;
+  category?: string;
+  featured?: boolean;
+  cover?: string | null;
+  links?: Array<{ label: string; href: string; external: boolean }>;
+  context?: 'home' | 'archive';
+  class?: string;
+}
+
+const {
+  href,
+  title,
+  description,
+  status,
+  stack,
+  github,
+  demo,
+  caseStudy,
+  category,
+  featured = false,
+  cover = null,
+  links = [],
+  context = 'archive',
+  class: className = '',
+} = Astro.props;
+const coverImage = typeof cover === 'string' ? cover.trim() : '';
+const actions = getProjectActions({ href, github, demo, caseStudy, links });
+const stackLimit = context === 'home' ? 4 : stack.length;
+---
+
+<article
+  class:list={[
+    'content-card bento-surface project-card',
+    coverImage ? 'project-card--image' : 'project-card--text',
+    context === 'home' && 'home-preview',
+    context === 'home' && !href && 'home-preview--full-description',
+    className,
+  ]}
+>
+  {
+    coverImage && (
+      <img
+        class="project-cover"
+        src={coverImage}
+        alt={`Cover image for ${title}`}
+        loading="lazy"
+        decoding="async"
+        width="1280"
+        height="720"
+      />
+    )
+  }
+  <div class="project-copy">
+    {context === 'home' ? <h3>{title}</h3> : <h2>{title}</h2>}
+    <p class="project-description">{description}</p>
+  </div>
+  <div class="project-meta" aria-label="Project details">
+    <StatusPill {status} />
+    {category && <Tag tone="accent">{category}</Tag>}
+    {context === 'archive' && featured && <Tag tone="strong">Featured</Tag>}
+  </div>
+  <CompactTagList
+    items={stack}
+    limit={stackLimit}
+    label="technologies"
+    class="project-stack"
+  />
+  {
+    actions.length > 0 && (
+      <div class="project-actions">
+        {actions.map((action) => (
+          <Button
+            href={action.href}
+            external={action.external}
+            size="sm"
+            variant={action.variant}
+          >
+            {action.label}
+          </Button>
+        ))}
+      </div>
+    )
+  }
+</article>
+
+<style>
+  .project-card {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.8rem;
+    padding: clamp(1rem, 1.5vw, 1.35rem);
+  }
+  .project-card--text {
+    border-left: 2px solid var(--accent);
+    background: color-mix(in srgb, var(--card) 97%, var(--accent));
+  }
+  .project-cover {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--muted);
+  }
+  .project-copy {
+    min-width: 0;
+  }
+  h2,
+  h3 {
+    margin: 0;
+    color: var(--foreground);
+    font-size: 1.05rem;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+  .project-description {
+    margin: 0.4rem 0 0;
+    color: var(--muted-foreground);
+    font-size: 0.88rem;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+  }
+  .project-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+  .project-stack {
+    margin-top: 0.1rem;
+  }
+  .project-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem;
+    padding-top: 0.15rem;
+  }
+  .project-actions :global(.button:focus-visible) {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+  .home-preview:not(.home-preview--full-description) .project-description {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+  }
+  @media (max-width: 767px) {
+    .project-card {
+      gap: 0.7rem;
+      padding: 1rem;
+    }
+    .project-cover {
+      margin-bottom: 0.1rem;
+    }
+  }
+</style>

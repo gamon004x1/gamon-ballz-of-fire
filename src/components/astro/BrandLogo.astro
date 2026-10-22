@@ -1,0 +1,76 @@
+---
+interface Props {
+  href?: string;
+  placement?: 'header' | 'footer' | 'standalone';
+  class?: string;
+  priority?: boolean;
+}
+
+const { href, placement = 'standalone', class: className } = Astro.props;
+
+import { getPublicSiteSettings } from '../../lib/server/siteSettings';
+const { siteName } = await getPublicSiteSettings();
+---
+
+{
+  href ? (
+    <a
+      href={href}
+      class:list={['brand-logo', `brand-logo--${placement}`, className]}
+      aria-label={`${siteName} home`}
+    >
+      <span class="logo-frame" aria-hidden="true">
+        {siteName}
+      </span>
+    </a>
+  ) : (
+    <span
+      class:list={['brand-logo', `brand-logo--${placement}`, className]}
+      role="img"
+      aria-label={siteName}
+    >
+      <span class="logo-frame" aria-hidden="true">
+        {siteName}
+      </span>
+    </span>
+  )
+}
+
+<style>
+  .brand-logo {
+    display: inline-flex;
+    min-height: 44px;
+    max-width: 100%;
+    align-items: center;
+    justify-content: flex-start;
+    flex-shrink: 0;
+    border-radius: var(--radius-sm);
+  }
+  .brand-logo:focus-visible {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: 4px;
+  }
+  .logo-frame {
+    display: flex;
+    width: 100%;
+    aspect-ratio: 690 / 250;
+    align-items: center;
+    color: var(--foreground);
+    font: 700 0.78rem/1.15 var(--type-heading);
+    overflow-wrap: anywhere;
+  }
+  .brand-logo--header .logo-frame {
+    width: clamp(10.5rem, 15vw, 12rem);
+  }
+  .brand-logo--footer .logo-frame {
+    width: clamp(12rem, 24vw, 15rem);
+  }
+  .brand-logo--standalone .logo-frame {
+    width: clamp(10.5rem, 50vw, 12rem);
+  }
+  @media (max-width: 480px) {
+    .brand-logo--header .logo-frame {
+      width: clamp(9rem, 44vw, 10.5rem);
+    }
+  }
+</style>

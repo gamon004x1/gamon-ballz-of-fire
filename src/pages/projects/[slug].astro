@@ -1,0 +1,537 @@
+---
+import { render } from 'astro:content';
+import BentoCard from '../../components/astro/BentoCard.astro';
+import Button from '../../components/astro/Button.astro';
+import CollectionHeader from '../../components/astro/CollectionHeader.astro';
+import IconLink from '../../components/astro/IconLink.astro';
+import Layout from '../../components/astro/Layout.astro';
+import ProjectMeta from '../../components/astro/ProjectMeta.astro';
+import StatusPill from '../../components/astro/StatusPill.astro';
+import Tag from '../../components/astro/Tag.astro';
+import { formatPageTitle } from '../../lib/data/pageTitle';
+import { renderProjectMarkdownDocument } from '../../lib/server/markdown';
+import { normalizeProjectDisplayLinks } from '../../lib/data/projectLinks';
+import {
+  getPublicProjectCatalog,
+  publicProjectUrl,
+} from '../../lib/server/publicProjects';
+import {
+  getContentRedirect,
+  publicRedirectTarget,
+} from '../../lib/server/redirects';
+import { getPublicSiteSettings } from '../../lib/server/siteSettings';
+
+const requestedPath = `/projects/${Astro.params.slug}`;
+
+// Resolve only against the catalog that already applies visibility, archive,
+// MDX replacement, and redirect-alias rules.
+const [redirect, projects, settings] = await Promise.all([
+  getContentRedirect(requestedPath),
+  getPublicProjectCatalog(),
+  getPublicSiteSettings(),
+]);
+if (redirect.status === 'unavailable') {
+  return new Response('Content temporarily unavailable.', {
+    status: 503,
+    headers: {
+      'content-type': 'text/plain; charset=utf-8',
+      'cache-control': 'no-store',
+    },
+  });
+}
+if (redirect.status === 'found') {
+  const target = projects
+    .map((project) =>
+      publicRedirectTarget(
+        redirect.record,
+        'project',
+        project.id,
+        project.slug,
+        requestedPath,
+      ),
+    )
+    .find((value): value is string => value !== null);
+  if (!target) {
+    return new Response('Project not found.', {
+      status: 404,
+      headers: {
+        'content-type': 'text/plain; charset=utf-8',
+        'cache-control': 'no-store',
+      },
+    });
+  }
+  return new Response(null, {
+    status: 302,
+    headers: { location: target, 'cache-control': 'no-store' },
+  });
+}
+const index = projects.findIndex(
+  (project) => project.slug === Astro.params.slug,
+);
+const project = projects[index];
+if (!project) {
+  return new Response('Project not found.', {
+    status: 404,
+    headers: { 'content-type': 'text/plain; charset=utf-8' },
+  });
+}
+
+const detailProjects = projects;
+const detailIndex = index;
+const previousProject = detailProjects[detailIndex - 1];
+const nextProject = detailProjects[detailIndex + 1];
+const data = project;
+const mdxRender =
+  project.source === 'mdx' && project.entry
+    ? await render(project.entry)
+    : null;
+const Content = mdxRender?.Content ?? null;
+const markdownDocument =
+  project.source === 'database' && project.body.trim()
+    ? renderProjectMarkdownDocument(project.body)
+    : null;
+const renderedMarkdown = markdownDocument?.html ?? '';
+const hasArticle =
+  project.source === 'mdx'
+    ? Boolean(Content && project.body.trim())
+    : Boolean(renderedMarkdown.trim());
+const headings = mdxRender
+  ? mdxRender.headings
+      .filter((heading) => heading.depth <= 3 && heading.slug && heading.text)
+      .map((heading) => ({ id: heading.slug, label: heading.text }))
+  : (markdownDocument?.headings ?? []);
+const formattedDate = new Intl.DateTimeFormat('en', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+  timeZone: 'UTC',
+}).format(data.date);
+const cover = data.cover?.trim() || null;
+const screenshots = data.screenshots.filter((item) => item.src !== cover);
+const stackItems = data.stack.filter((item) => item.trim());
+
+const candidates = [
+  ...(data.demo
+    ? [{ label: 'Live demo', href: data.demo, external: true }]
+    : []),
+  ...(data.github
+    ? [{ label: 'GitHub', href: data.github, external: true }]
+    : []),
+  ...data.links,
+];
+const projectLinks = normalizeProjectDisplayLinks(candidates);
+const hasSummary = Boolean(
+  data.problem?.trim() ||
+  data.solution?.trim() ||
+  data.highlights.some((item) => item.trim()),
+);
+const metadataItems = [
+  { label: data.dateLabel, value: formattedDate },
+  ...(data.role?.trim() ? [{ label: 'Role', value: data.role }] : []),
+  ...(stackItems.length ? [{ label: 'Stack', items: stackItems }] : []),
+];
+---
+
+<Layout
+  title={formatPageTitle(data.title, settings.name)}
+  description={data.description}
+  type="article"
+  siteSettings={settings}
+>
+  <CollectionHeader active="projects" />
+
+  <div class="back-link">
+    <IconLink href="/projects" label="Back to projects" />
+  </div>
+
+  <BentoCard class="project-hero subtle-grid" accent="strong">
+    {
+      cover && (
+        <img
+          class="project-cover"
+          src={cover}
+          alt={`Cover image for ${data.title}`}
+          fetchpriority="high"
+        />
+      )
+    }
+    <div class="hero-meta">
+      <StatusPill status={data.status} />
+      {data.category?.trim() && <Tag tone="accent">{data.category}</Tag>}
+      {data.featured && <Tag tone="strong">Featured</Tag>}
+    </div>
+    <h1 class="text-balance">{data.title}</h1>
+    <p>{data.description}</p>
+    {
+      projectLinks.length > 0 && (
+        <div class="hero-links" aria-label="Project links">
+          {projectLinks.map((link, index) => (
+            <Button
+              href={link.href}
+              external={link.external}
+              size="sm"
+              variant={index === 0 ? 'primary' : 'secondary'}
+            >
+              {link.label}
+            </Button>
+          ))}
+        </div>
+      )
+    }
+  </BentoCard>
+
+  {
+    screenshots.length > 0 && (
+      <section
+        class="project-gallery bento-surface"
+        aria-labelledby="gallery-title"
+      >
+        <h2 id="gallery-title">Project screenshots</h2>
+        <div class="gallery-grid">
+          {screenshots.map((screenshot) => (
+            <figure>
+              <img
+                src={screenshot.src}
+                alt={screenshot.alt}
+                loading="lazy"
+                decoding="async"
+              />
+              {screenshot.caption?.trim() && (
+                <figcaption>{screenshot.caption}</figcaption>
+              )}
+            </figure>
+          ))}
+        </div>
+      </section>
+    )
+  }
+
+  {
+    metadataItems.length > 0 && (
+      <section class="metadata-grid" aria-label="Project information">
+        {metadataItems.map((item) => (
+          <ProjectMeta
+            label={item.label}
+            value={'value' in item ? item.value : undefined}
+            items={'items' in item ? item.items : undefined}
+            class={'items' in item ? 'stack-meta' : ''}
+          />
+        ))}
+      </section>
+    )
+  }
+
+  {
+    hasSummary && (
+      <aside class="case-summary bento-surface" aria-label="Project overview">
+        {data.problem?.trim() && (
+          <section>
+            <h2>Problem</h2>
+            <p>{data.problem}</p>
+          </section>
+        )}
+        {data.solution?.trim() && (
+          <section>
+            <h2>Solution</h2>
+            <p>{data.solution}</p>
+          </section>
+        )}
+        {data.highlights.some((item) => item.trim()) && (
+          <section>
+            <h2>Highlights</h2>
+            <ul>
+              {data.highlights
+                .filter((item) => item.trim())
+                .map((highlight) => (
+                  <li>{highlight}</li>
+                ))}
+            </ul>
+          </section>
+        )}
+      </aside>
+    )
+  }
+
+  {
+    hasArticle && (
+      <div
+        class:list={[
+          'case-study-layout',
+          { 'without-nav': headings.length === 0 },
+        ]}
+      >
+        {headings.length > 0 && (
+          <nav class="local-nav bento-surface" aria-label="Case study sections">
+            <p>On this page</p>
+            {headings.map((heading) => (
+              <a href={`#${heading.id}`}>{heading.label}</a>
+            ))}
+          </nav>
+        )}
+        <article class="prose-shell bento-surface">
+          {Content ? <Content /> : <Fragment set:html={renderedMarkdown} />}
+        </article>
+      </div>
+    )
+  }
+
+  {
+    detailProjects.length === 1 ? (
+      <nav
+        class="project-navigation single-project"
+        aria-label="Project navigation"
+      >
+        <a href="/projects">← All projects</a>
+      </nav>
+    ) : (
+      <nav class="project-navigation" aria-label="Project navigation">
+        <div>
+          <span>Previous project</span>
+          {previousProject ? (
+            <a href={publicProjectUrl(previousProject)}>
+              ← {previousProject.title}
+            </a>
+          ) : (
+            <a href="/projects">← All projects</a>
+          )}
+        </div>
+        <div class="next-project">
+          <span>Next project</span>
+          {nextProject ? (
+            <a href={publicProjectUrl(nextProject)}>{nextProject.title} →</a>
+          ) : (
+            <a href="/projects">All projects →</a>
+          )}
+        </div>
+      </nav>
+    )
+  }
+</Layout>
+
+<style>
+  .back-link {
+    margin-bottom: 1rem;
+  }
+  .project-cover {
+    display: block;
+    width: 100%;
+    max-height: 34rem;
+    margin-bottom: 1.25rem;
+    object-fit: cover;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+  .project-gallery {
+    margin-top: 0.75rem;
+    padding: clamp(1rem, 3vw, 1.5rem);
+  }
+  .project-gallery h2 {
+    margin: 0 0 1rem;
+    color: var(--accent-text);
+    font: 0.72rem var(--font-mono);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.85rem;
+  }
+  .gallery-grid figure {
+    min-width: 0;
+    margin: 0;
+    padding: 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--card);
+  }
+  .gallery-grid img {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 34rem;
+    object-fit: contain;
+  }
+  .gallery-grid figcaption {
+    margin-top: 0.55rem;
+    color: var(--muted-foreground);
+    font-size: 0.8rem;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+  @media (max-width: 700px) {
+    .gallery-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+  :global(.project-hero) {
+    padding: clamp(1.5rem, 5vw, 3rem);
+  }
+  .hero-meta,
+  .hero-links {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+  }
+  h1 {
+    max-width: 17ch;
+    margin: 1rem 0 0;
+    font-size: clamp(2.4rem, 8vw, 5rem);
+    line-height: 0.98;
+    letter-spacing: 0.02em;
+    overflow-wrap: anywhere;
+  }
+  .project-hero > p {
+    max-width: 65ch;
+    margin: 1rem 0 0;
+    color: var(--muted-foreground);
+    font-size: clamp(1rem, 2vw, 1.15rem);
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+  }
+  .hero-links {
+    margin-top: 1.2rem;
+  }
+  .metadata-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+  }
+  :global(.stack-meta) {
+    grid-column: 1 / -1;
+  }
+  .case-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+    gap: 0;
+    margin-top: 0.75rem;
+    overflow: hidden;
+    box-shadow: none;
+  }
+  .case-summary section {
+    min-width: 0;
+    padding: 1.15rem;
+    border-right: 1px solid var(--border);
+  }
+  .case-summary h2 {
+    margin: 0 0 0.55rem;
+    color: var(--accent-text);
+    font: 0.65rem/1.4 var(--font-mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .case-summary p,
+  .case-summary li {
+    margin: 0;
+    color: var(--muted-foreground);
+    font-size: 0.84rem;
+    font-weight: 500;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+  }
+  .case-summary ul {
+    display: grid;
+    gap: 0.35rem;
+    margin: 0;
+    padding-left: 1.1rem;
+  }
+  .case-study-layout {
+    display: grid;
+    grid-template-columns: 12rem minmax(0, 1fr);
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+    align-items: start;
+  }
+  .case-study-layout.without-nav {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .local-nav {
+    position: sticky;
+    top: 1rem;
+    display: grid;
+    gap: 0.45rem;
+    padding: 1rem;
+    box-shadow: none;
+  }
+  .local-nav p {
+    margin: 0 0 0.1rem;
+    color: var(--accent-text);
+    font: 0.65rem var(--font-mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .local-nav a {
+    color: var(--muted-foreground);
+    font: 0.7rem/1.4 var(--font-mono);
+    overflow-wrap: anywhere;
+  }
+  .local-nav a:hover,
+  .local-nav a:focus-visible {
+    color: var(--accent-text);
+  }
+  .local-nav a:focus-visible,
+  .project-navigation a:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 3px;
+  }
+  .project-navigation {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    margin-top: 1.25rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border);
+  }
+  .project-navigation div {
+    display: grid;
+    min-width: 0;
+    align-content: start;
+    gap: 0.25rem;
+  }
+  .project-navigation span {
+    color: var(--muted-foreground);
+    font: 0.65rem var(--font-mono);
+  }
+  .project-navigation a {
+    font-weight: 650;
+    overflow-wrap: anywhere;
+  }
+  .project-navigation a:hover {
+    color: var(--accent-text);
+  }
+  .next-project {
+    text-align: right;
+  }
+  .single-project {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  @media (max-width: 1023px) {
+    .case-study-layout {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .local-nav {
+      position: static;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+    }
+  }
+  @media (max-width: 767px) {
+    .case-summary section {
+      border-right: 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .case-summary section:last-child {
+      border-bottom: 0;
+    }
+  }
+  @media (max-width: 480px) {
+    .metadata-grid,
+    .project-navigation {
+      grid-template-columns: 1fr;
+    }
+    .next-project {
+      text-align: left;
+    }
+  }
+</style>

@@ -1,0 +1,81 @@
+---
+interface Props {
+  id?: string;
+  title?: string;
+  eyebrow?: string;
+  description?: string;
+  class?: string;
+  style?: string;
+  accent?: 'none' | 'soft' | 'medium' | 'strong';
+}
+const {
+  id,
+  title,
+  eyebrow,
+  description,
+  class: className = '',
+  style,
+  accent = 'none',
+} = Astro.props;
+---
+
+<section
+  {id}
+  {style}
+  class:list={['bento-card bento-surface', `accent-${accent}`, className]}
+>
+  {
+    (eyebrow || title || description) && (
+      <header>
+        {eyebrow && <p class="eyebrow">{eyebrow}</p>}
+        {title && <h2>{title}</h2>}
+        {description && <p class="card-description">{description}</p>}
+      </header>
+    )
+  }
+  <slot />
+</section>
+<style>
+  .bento-card {
+    --card-accent: var(--border);
+    position: relative;
+    min-width: 0;
+    padding: clamp(1.15rem, 3vw, 1.75rem);
+    overflow: hidden;
+  }
+  .bento-card::before {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 2px;
+    background: var(--card-accent);
+    content: '';
+    opacity: 0.72;
+  }
+  .accent-soft {
+    --card-accent: color-mix(in srgb, var(--accent) 38%, var(--border));
+  }
+  .accent-medium {
+    --card-accent: var(--accent);
+  }
+  .accent-strong {
+    --card-accent: var(--accent-hover);
+  }
+  header {
+    margin-bottom: 1rem;
+  }
+  header .eyebrow {
+    margin: 0 0 0.35rem;
+  }
+  h2 {
+    margin: 0;
+    font-size: clamp(1.05rem, 2vw, 1.25rem);
+    line-height: 1.25;
+    letter-spacing: -0.025em;
+  }
+  .card-description {
+    max-width: 62ch;
+    margin: 0.55rem 0 0;
+    color: var(--muted-foreground);
+    font-size: 0.92rem;
+  }
+</style>

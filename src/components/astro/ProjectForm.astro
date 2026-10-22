@@ -1,0 +1,457 @@
+---
+import type {
+  ProjectFormValues,
+  ProjectStatus,
+} from '../../lib/server/validation/projects';
+import MarkdownEditor from '../svelte/MarkdownEditor.svelte';
+import MediaUpload from '../svelte/MediaUpload.svelte';
+import ProjectScreenshotEditor from '../svelte/ProjectScreenshotEditor.svelte';
+import ContentPagePreview from '../svelte/ContentPagePreview.svelte';
+import AuthoringFormController from '../svelte/AuthoringFormController.svelte';
+
+interface Props {
+  action: string;
+  submitLabel: string;
+  values?: Partial<ProjectFormValues>;
+  errors?: Record<string, string>;
+  archived?: boolean;
+}
+
+const {
+  action,
+  submitLabel,
+  values = {},
+  errors = {},
+  archived = false,
+} = Astro.props;
+const statuses: ProjectStatus[] = archived
+  ? ['Archived']
+  : ['Planning', 'Prototype', 'In Progress', 'Live'];
+const fieldError = (name: keyof ProjectFormValues) => errors[name];
+---
+
+<form
+  id="project-editor"
+  class="project-form bento-surface"
+  method="post"
+  {action}
+>
+  <div class="form-grid">
+    <label>
+      <span>Title <strong aria-hidden="true">*</strong></span>
+      <input
+        name="title"
+        required
+        maxlength="120"
+        value={values.title ?? ''}
+        aria-invalid={Boolean(fieldError('title'))}
+      />
+      {fieldError('title') && <small>{fieldError('title')}</small>}
+    </label>
+    <label>
+      <span>Slug <strong aria-hidden="true">*</strong></span>
+      <input
+        name="slug"
+        required
+        maxlength="80"
+        pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+        placeholder="project-name"
+        value={values.slug ?? ''}
+        aria-invalid={Boolean(fieldError('slug'))}
+      />
+      {fieldError('slug') && <small>{fieldError('slug')}</small>}
+      <small
+        >Changing a published slug keeps the old URL working through a permanent
+        redirect.</small
+      >
+    </label>
+
+    <label class="full">
+      <span>Description <strong aria-hidden="true">*</strong></span>
+      <textarea
+        name="description"
+        required
+        maxlength="300"
+        rows="3"
+        aria-invalid={Boolean(fieldError('description'))}
+        >{values.description ?? ''}</textarea
+      >
+      {fieldError('description') && <small>{fieldError('description')}</small>}
+    </label>
+  </div>
+
+  <details class="authoring-section">
+    <summary>Additional details and media</summary>
+    <div class="form-grid">
+      <div class="full">
+        <ProjectScreenshotEditor
+          client:load
+          value={JSON.parse(values.screenshots ?? '[]')}
+        />
+        {
+          fieldError('screenshots') && (
+            <small>{fieldError('screenshots')}</small>
+          )
+        }
+      </div>
+
+      <label>
+        <span>Status</span>
+        <select name="status" disabled={archived}>
+          {
+            statuses.map((status) => (
+              <option
+                value={status}
+                selected={(values.status ?? 'Planning') === status}
+              >
+                {status}
+              </option>
+            ))
+          }
+        </select>
+        {archived && <input type="hidden" name="status" value="Archived" />}
+        {fieldError('status') && <small>{fieldError('status')}</small>}
+      </label>
+
+      <label>
+        <span>Category</span>
+        <input name="category" maxlength="80" value={values.category ?? ''} />
+        {fieldError('category') && <small>{fieldError('category')}</small>}
+      </label>
+
+      <label>
+        <span>Project date</span>
+        <input
+          name="projectDate"
+          type="date"
+          value={values.projectDate ?? ''}
+        />
+        {
+          fieldError('projectDate') && (
+            <small>{fieldError('projectDate')}</small>
+          )
+        }
+      </label>
+
+      <label>
+        <span>Role</span>
+        <input name="role" maxlength="200" value={values.role ?? ''} />
+        {fieldError('role') && <small>{fieldError('role')}</small>}
+      </label>
+
+      <label>
+        <span>Order index</span>
+        <input
+          name="orderIndex"
+          type="number"
+          min="-10000"
+          max="10000"
+          step="1"
+          value={values.orderIndex ?? ''}
+        />
+        {fieldError('orderIndex') && <small>{fieldError('orderIndex')}</small>}
+      </label>
+
+      <label class="full">
+        <span>Problem</span>
+        <textarea name="problem" maxlength="1000" rows="4"
+          >{values.problem ?? ''}</textarea
+        >
+        {fieldError('problem') && <small>{fieldError('problem')}</small>}
+      </label>
+
+      <label class="full">
+        <span>Solution / direction</span>
+        <textarea name="solution" maxlength="1000" rows="4"
+          >{values.solution ?? ''}</textarea
+        >
+        {fieldError('solution') && <small>{fieldError('solution')}</small>}
+      </label>
+
+      <label class="full">
+        <span>Highlights</span>
+        <textarea name="highlights" rows="4">{values.highlights ?? ''}</textarea
+        >
+        <em>One per line; up to 12.</em>
+        {fieldError('highlights') && <small>{fieldError('highlights')}</small>}
+      </label>
+
+      <label>
+        <span>Stack</span>
+        <textarea
+          name="stack"
+          rows="7"
+          placeholder={'Astro\nTypeScript\nSQLite'}
+          >{values.stack ?? ''}</textarea
+        >
+        <em>One item per line; up to 20.</em>
+        {fieldError('stack') && <small>{fieldError('stack')}</small>}
+      </label>
+
+      <label>
+        <span>Additional links</span>
+        <textarea
+          name="links"
+          rows="7"
+          placeholder={'Documentation | https://example.com/docs\nDemo | https://example.com'}
+          >{values.links ?? ''}</textarea
+        >
+        <em>One HTTP(S) link per line; up to 8.</em>
+        {fieldError('links') && <small>{fieldError('links')}</small>}
+      </label>
+
+      <label>
+        <span>GitHub URL</span>
+        <input
+          name="github"
+          type="url"
+          maxlength="2048"
+          value={values.github ?? ''}
+        />
+        {fieldError('github') && <small>{fieldError('github')}</small>}
+      </label>
+
+      <label>
+        <span>Demo URL</span>
+        <input
+          name="demo"
+          type="url"
+          maxlength="2048"
+          value={values.demo ?? ''}
+        />
+        {fieldError('demo') && <small>{fieldError('demo')}</small>}
+      </label>
+
+      <label class="full">
+        <span>Cover path or URL</span>
+        <input
+          id="project-cover"
+          name="cover"
+          maxlength="2048"
+          value={values.cover ?? ''}
+        />
+        <MediaUpload client:load targetId="project-cover" />
+        {fieldError('cover') && <small>{fieldError('cover')}</small>}
+      </label>
+    </div>
+  </details>
+
+  <div class="content-section">
+    <div class="section-heading">
+      <strong>Content</strong><span>Optional Markdown case study</span>
+    </div>
+    <MarkdownEditor
+      client:load
+      value={values.caseStudyBody ?? ''}
+      starter="project"
+    />
+    {
+      fieldError('caseStudyBody') && (
+        <small>{fieldError('caseStudyBody')}</small>
+      )
+    }
+  </div>
+
+  <fieldset disabled={archived}>
+    <legend>Public state</legend>
+    <label class="check">
+      <input type="checkbox" name="visible" checked={values.visible ?? false} />
+      Visible on public project surfaces
+    </label>
+    <label class="check">
+      <input
+        type="checkbox"
+        name="featured"
+        checked={values.featured ?? false}
+      />
+      Prioritize in project ordering
+    </label>
+    <label class="check">
+      <input
+        type="checkbox"
+        name="replacesMdx"
+        checked={values.replacesMdx ?? false}
+      />
+      Use this record instead of matching MDX content
+    </label>
+    <p class="source-help">
+      Use this after reviewing the case study. Hiding or archiving an adopted
+      record also hides its matching MDX page.
+    </p>
+  </fieldset>
+
+  {
+    archived && (
+      <p class="archive-note">
+        This record is hidden. Restore it to review visibility.
+      </p>
+    )
+  }
+
+  <div class="form-actions">
+    <ContentPagePreview client:load formId="project-editor" kind="project" />
+    <button type="submit">{submitLabel}</button>
+    <a href="/user/projects">Cancel</a>
+  </div>
+</form>
+<AuthoringFormController client:load formId="project-editor" />
+
+<style>
+  .project-form {
+    padding: clamp(1rem, 3vw, 1.5rem);
+    box-shadow: none;
+  }
+  .field-title {
+    display: block;
+    margin-bottom: 0.45rem;
+    font: 650 0.75rem var(--font-mono);
+  }
+  .source-help {
+    margin: 0.2rem 0 0;
+    color: var(--muted-foreground);
+    font-size: 0.8rem;
+  }
+  .authoring-section {
+    margin-top: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+  .authoring-section > summary {
+    cursor: pointer;
+    color: var(--foreground);
+    font: 650 0.76rem var(--font-mono);
+  }
+  .authoring-section[open] > summary {
+    margin-bottom: 1rem;
+  }
+  .content-section {
+    margin-top: 1.25rem;
+  }
+  .section-heading {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+    font: 0.75rem var(--font-mono);
+  }
+  .section-heading span {
+    color: var(--muted-foreground);
+  }
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+  label,
+  fieldset {
+    min-width: 0;
+  }
+  label {
+    display: grid;
+    gap: 0.4rem;
+  }
+  label > span,
+  legend {
+    color: var(--foreground);
+    font: 0.7rem var(--font-mono);
+  }
+  strong {
+    color: var(--danger-text);
+  }
+  input,
+  textarea,
+  select {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--background);
+    color: var(--foreground);
+    font: 0.82rem/1.55 var(--font-sans);
+  }
+  input,
+  select {
+    min-height: 2.7rem;
+    padding: 0.65rem 0.75rem;
+  }
+  textarea {
+    resize: vertical;
+    padding: 0.75rem;
+  }
+  :is(input, textarea, select)[aria-invalid='true'] {
+    border-color: var(--danger-border);
+  }
+  small {
+    color: var(--danger-text);
+    font: 0.875rem/1.45 var(--type-body);
+  }
+  em {
+    color: var(--muted-foreground);
+    font: normal 0.875rem/1.45 var(--type-body);
+  }
+  .full {
+    grid-column: 1 / -1;
+  }
+  fieldset {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.85rem 1.25rem;
+    margin: 1.25rem 0 0;
+    padding: 1rem;
+    border: 1px solid var(--border);
+  }
+  legend {
+    padding-inline: 0.35rem;
+  }
+  .check {
+    display: flex;
+    align-items: center;
+    grid-template-columns: auto 1fr;
+    color: var(--muted-foreground);
+    font-size: 0.78rem;
+  }
+  .check input {
+    width: 1rem;
+    min-height: 1rem;
+    accent-color: var(--accent);
+  }
+  .archive-note {
+    margin: 1rem 0 0;
+    color: var(--danger-text);
+    font: 0.875rem/1.5 var(--type-body);
+  }
+  .form-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    margin-top: 1.25rem;
+  }
+  .form-actions :is(button, a) {
+    min-height: 2.5rem;
+    padding: 0.65rem 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font: 600 0.7rem var(--type-ui);
+  }
+  button {
+    border-color: var(--primary-background);
+    background: var(--primary-background);
+    color: var(--primary-foreground);
+    cursor: pointer;
+  }
+  :is(button, a, summary, input, textarea, select):focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .form-actions a {
+    color: var(--muted-foreground);
+  }
+  @media (max-width: 720px) {
+    .form-grid {
+      grid-template-columns: 1fr;
+    }
+    .full {
+      grid-column: auto;
+    }
+  }
+</style>

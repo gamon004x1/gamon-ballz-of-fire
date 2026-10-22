@@ -1,0 +1,226 @@
+---
+import { render } from 'astro:content';
+import BentoCard from '../../components/astro/BentoCard.astro';
+import CollectionHeader from '../../components/astro/CollectionHeader.astro';
+import IconLink from '../../components/astro/IconLink.astro';
+import Layout from '../../components/astro/Layout.astro';
+import Tag from '../../components/astro/Tag.astro';
+import { formatPageTitle } from '../../lib/data/pageTitle';
+import { formatDate, getNoteReadingTime } from '../../lib/notes';
+import { renderProjectMarkdown } from '../../lib/server/markdown';
+import { getPublicNoteCatalog } from '../../lib/server/notes';
+import {
+  getContentRedirect,
+  publicRedirectTarget,
+} from '../../lib/server/redirects';
+import { getPublicSiteSettings } from '../../lib/server/siteSettings';
+
+export const prerender = false;
+const requestedPath = `/notes/${Astro.params.slug}`;
+const [redirect, notes, settings] = await Promise.all([
+  getContentRedirect(requestedPath),
+  getPublicNoteCatalog(),
+  getPublicSiteSettings(),
+]);
+if (redirect.status === 'unavailable') {
+  return new Response('Content temporarily unavailable.', {
+    status: 503,
+    headers: {
+      'content-type': 'text/plain; charset=utf-8',
+      'cache-control': 'no-store',
+    },
+  });
+}
+if (redirect.status === 'found') {
+  const target = notes
+    .map((note) =>
+      publicRedirectTarget(
+        redirect.record,
+        'note',
+        note.id,
+        note.slug,
+        requestedPath,
+      ),
+    )
+    .find((value): value is string => value !== null);
+  if (!target) {
+    return new Response('Note not found.', {
+      status: 404,
+      headers: {
+        'content-type': 'text/plain; charset=utf-8',
+        'cache-control': 'no-store',
+      },
+    });
+  }
+  return new Response(null, {
+    status: 302,
+    headers: { location: target, 'cache-control': 'no-store' },
+  });
+}
+const index = notes.findIndex((note) => note.slug === Astro.params.slug);
+const note = notes[index];
+if (!note) return new Response('Note not found.', { status: 404 });
+const Content = note.entry ? (await render(note.entry)).Content : null;
+const html = note.source === 'database' ? renderProjectMarkdown(note.body) : '';
+const readingTime = getNoteReadingTime(note.body);
+const newer = notes[index - 1];
+const older = notes[index + 1];
+---
+
+<Layout
+  title={formatPageTitle(note.title, settings.name)}
+  description={note.description}
+  type="article"
+  siteSettings={settings}
+>
+  <CollectionHeader active="notes" />
+  <div class="back-link"><IconLink href="/notes" label="Back to notes" /></div>
+  <BentoCard class="note-hero subtle-grid" accent="medium">
+    <div class="hero-meta">
+      <Tag tone="accent">{note.category}</Tag>{
+        note.featured && <Tag tone="strong">Featured</Tag>
+      }
+    </div>
+    <h1 class="text-balance">{note.title}</h1>
+    <p class="description">{note.description}</p>
+    <div class="meta">
+      <span
+        >Published <time datetime={note.createdAt.toISOString()}
+          >{formatDate(note.createdAt)}</time
+        ></span
+      >{
+        note.updatedAt && (
+          <span>
+            Updated{' '}
+            <time datetime={note.updatedAt.toISOString()}>
+              {formatDate(note.updatedAt)}
+            </time>
+          </span>
+        )
+      }<span>{readingTime}</span>
+    </div>
+    <div class="tags" aria-label="Note tags">
+      {note.tags.map((tag) => <Tag>{tag}</Tag>)}
+    </div>
+  </BentoCard>
+  {
+    note.summary && (
+      <aside class="summary bento-surface">
+        <>
+          <strong>In short</strong>
+          <p>{note.summary}</p>
+        </>
+      </aside>
+    )
+  }
+  <article class="prose-shell bento-surface">
+    {Content ? <Content /> : <div set:html={html} />}
+  </article>
+  <nav class="note-navigation" aria-label="Note navigation">
+    <div>
+      <span>Older note</span>{
+        older ? (
+          <a href={`/notes/${older.slug}`}>← {older.title}</a>
+        ) : (
+          <span>End of archive</span>
+        )
+      }
+    </div>
+    <div class="newer">
+      <span>Newer note</span>{
+        newer ? (
+          <a href={`/notes/${newer.slug}`}>{newer.title} →</a>
+        ) : (
+          <a href="/notes">All notes →</a>
+        )
+      }
+    </div>
+  </nav>
+</Layout>
+<style>
+  .back-link {
+    margin-bottom: 1rem;
+  }
+  :global(.note-hero) {
+    padding: clamp(1.5rem, 5vw, 3rem);
+  }
+  .hero-meta,
+  .meta,
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+  }
+  h1 {
+    max-width: 20ch;
+    margin: 1rem 0 0;
+    font-size: clamp(2.3rem, 8vw, 4.75rem);
+    line-height: 0.98;
+    letter-spacing: 0.02em;
+  }
+  .description {
+    max-width: 66ch;
+    margin: 1rem 0 0;
+    color: var(--muted-foreground);
+    font-size: clamp(1rem, 2vw, 1.15rem);
+  }
+  .meta {
+    margin-top: 1.25rem;
+    color: var(--muted-foreground);
+    font: 0.68rem/1.5 var(--font-mono);
+  }
+  .meta span + span:before {
+    margin-right: 0.45rem;
+    color: var(--border);
+    content: '/';
+  }
+  .tags {
+    margin-top: 0.8rem;
+  }
+  .summary {
+    display: grid;
+    grid-template-columns: 7rem minmax(0, 1fr);
+    gap: 1rem;
+    margin-top: 0.75rem;
+    padding: 1rem 1.25rem;
+    box-shadow: none;
+  }
+  .summary strong {
+    color: var(--accent-text);
+    font: 0.68rem var(--font-mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .summary p {
+    margin: 0;
+    color: var(--muted-foreground);
+  }
+  .prose-shell {
+    margin-top: 0.75rem;
+  }
+  .note-navigation {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    margin-top: 1.25rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border);
+  }
+  .note-navigation div {
+    display: grid;
+    gap: 0.25rem;
+  }
+  .note-navigation span {
+    color: var(--muted-foreground);
+    font: 0.65rem var(--font-mono);
+  }
+  .newer {
+    text-align: right;
+  }
+  @media (max-width: 560px) {
+    .summary {
+      grid-template-columns: 1fr;
+      gap: 0.4rem;
+    }
+  }
+</style>

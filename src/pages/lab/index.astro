@@ -1,0 +1,158 @@
+---
+import ArchiveIntro from '../../components/astro/ArchiveIntro.astro';
+import CardGrid from '../../components/astro/CardGrid.astro';
+import CollectionHeader from '../../components/astro/CollectionHeader.astro';
+import LabCard from '../../components/astro/LabCard.astro';
+import Layout from '../../components/astro/Layout.astro';
+import Tag from '../../components/astro/Tag.astro';
+import { formatPageTitle } from '../../lib/data/pageTitle';
+import { getPublicLabCatalog } from '../../lib/server/lab';
+import { getPublicSiteSettings } from '../../lib/server/siteSettings';
+import { LAB_STATUS_ORDER } from '../../lib/lab';
+
+export const prerender = false;
+
+const [entries, settings] = await Promise.all([
+  getPublicLabCatalog(),
+  getPublicSiteSettings(),
+]);
+const groups = LAB_STATUS_ORDER.map((status) => ({
+  status,
+  entries: entries.filter((entry) => entry.status === status),
+})).filter((group) => group.entries.length > 0);
+const categories = [
+  ...new Set(
+    entries.flatMap((entry) => (entry.category ? [entry.category.trim()] : [])),
+  ),
+].sort();
+const tags = [
+  ...new Set(entries.flatMap((entry) => entry.tags.map((tag) => tag.trim()))),
+].sort();
+---
+
+<Layout title={formatPageTitle('Lab', settings.name)} siteSettings={settings}>
+  <CollectionHeader active="lab" />
+  <ArchiveIntro
+    id="lab-title"
+    path="/lab"
+    title="Lab"
+    count={`${entries.length} visible`}
+    asideTitle="Small experiments and miscellaneous things"
+  >
+    {
+      entries.length > 0 && (
+        <div class="archive-topic">
+          <strong>Workshop areas</strong>
+          <p>{categories.join(', ')}</p>
+        </div>
+      )
+    }
+    {
+      entries.length > 0 && (
+        <div class="archive-topic">
+          <strong>Current materials</strong>
+          <div class="archive-tags">
+            {tags.map((tag) => (
+              <Tag>{tag}</Tag>
+            ))}
+          </div>
+        </div>
+      )
+    }
+  </ArchiveIntro>
+  <section aria-label="Lab archive">
+    {
+      entries.length > 0 ? (
+        <div class="status-groups">
+          {groups.map((group) => (
+            <section
+              class="status-group"
+              aria-labelledby={`status-${group.status}`}
+            >
+              <header>
+                <div>
+                  <span aria-hidden="true">./</span>
+                  <h2 id={`status-${group.status}`}>{group.status}</h2>
+                </div>
+                <small>{group.entries.length} entries</small>
+              </header>
+              <CardGrid class="collection-grid lab-archive-grid">
+                {group.entries.map((entry) => (
+                  <LabCard
+                    href={`/lab/${entry.slug}`}
+                    title={entry.title}
+                    description={entry.description}
+                    status={entry.status}
+                    tags={entry.tags}
+                    date={entry.date}
+                    category={entry.category ?? undefined}
+                    tools={entry.tools}
+                    featured={entry.featured}
+                    context="archive"
+                  />
+                ))}
+              </CardGrid>
+            </section>
+          ))}
+        </div>
+      ) : (
+        <p class="empty-state">No visible lab entries yet.</p>
+      )
+    }
+  </section>
+</Layout>
+
+<style>
+  :global(.collection-grid .content-card) {
+    height: 100%;
+    border-radius: var(--radius-md);
+    box-shadow: none;
+  }
+  :global(.lab-archive-grid.collection-grid) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  @media (max-width: 767px) {
+    :global(.lab-archive-grid.collection-grid) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+  .status-groups {
+    display: grid;
+    gap: 2rem;
+  }
+  .status-group > header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.8rem;
+    padding-bottom: 0.55rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .status-group > header div {
+    display: flex;
+    align-items: baseline;
+    gap: 0.1rem;
+  }
+  .status-group > header span {
+    color: var(--accent-text);
+    font: 0.78rem var(--font-mono);
+  }
+  .status-group h2 {
+    margin: 0;
+    font-size: 1rem;
+    letter-spacing: 0.02em;
+  }
+  .status-group small {
+    color: var(--muted-foreground);
+    font: 0.65rem var(--font-mono);
+  }
+  .empty-state {
+    margin: 0;
+    padding: 2rem;
+    border: 1px dashed var(--border);
+    background: var(--card);
+    color: var(--muted-foreground);
+    font: 1rem/1.65 var(--type-body);
+  }
+</style>

@@ -1,0 +1,110 @@
+---
+import '../../styles/global.css';
+import { site } from '../../lib/data/site';
+import { themeColors } from '../../lib/theme';
+import { getPublicSiteSettings } from '../../lib/server/siteSettings';
+import type { PublicSiteSettings } from '../../lib/server/siteSettings';
+import Footer from './Footer.astro';
+import SEO from './SEO.astro';
+
+interface Props {
+  title?: string;
+  description?: string;
+  image?: string;
+  type?: 'website' | 'article';
+  canonical?: string | URL;
+  noindex?: boolean;
+  searchable?: boolean;
+  class?: string;
+  siteSettings?: PublicSiteSettings;
+}
+
+const { siteSettings, ...props } = Astro.props;
+const publicSettings = siteSettings ?? (await getPublicSiteSettings());
+const {
+  title = `${publicSettings.name} — ${publicSettings.siteName}`,
+  description = publicSettings.seoDescription,
+  image,
+  type = 'website',
+  canonical,
+  noindex = false,
+  searchable = true,
+  class: className = '',
+} = props;
+---
+
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <SEO
+      {title}
+      {description}
+      {image}
+      {type}
+      {canonical}
+      {noindex}
+      author={publicSettings.name}
+      siteName={publicSettings.siteName}
+    />
+    <script is:inline define:vars={{ themeColors }}>
+      (() => {
+        const validThemes = ['light', 'dim', 'dark'];
+        let theme = 'dark';
+        try {
+          const savedTheme = localStorage.getItem('theme');
+          if (savedTheme && validThemes.includes(savedTheme))
+            theme = savedTheme;
+        } catch {}
+        document.documentElement.dataset.theme = theme;
+        document
+          .querySelector('meta[name="theme-color"]')
+          ?.setAttribute('content', themeColors[theme]);
+      })();
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <main
+      id="main-content"
+      class:list={['container-shell', className]}
+      tabindex="-1"
+      data-pagefind-body={searchable ? true : undefined}
+      data-pagefind-ignore={searchable ? undefined : true}
+    >
+      <slot />
+    </main>
+    <Footer
+      name={publicSettings.name}
+      github={publicSettings.github}
+      rss={site.rss}
+    />
+  </body>
+</html>
+
+<style>
+  main {
+    padding-block: clamp(1.5rem, 6vw, 4.5rem);
+  }
+  .skip-link {
+    position: fixed;
+    z-index: 100;
+    top: 0.75rem;
+    left: 0.75rem;
+    transform: translateY(-180%);
+    padding: 0.55rem 0.75rem;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--card);
+    color: var(--foreground);
+    font: 0.78rem var(--font-mono);
+  }
+  .skip-link:focus {
+    transform: translateY(0);
+  }
+  @media (max-width: 767px) {
+    main {
+      padding-block: 1rem 2rem;
+    }
+  }
+</style>

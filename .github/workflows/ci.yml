@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Enable pnpm through Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check types and Astro files
+        run: pnpm check
+
+      - name: Test portfolio terminal
+        run: pnpm test:terminal
+
+      - name: Test focused regressions and migrations
+        run: pnpm test:unit
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Test browser interactions
+        run: pnpm test:browser
+
+      - name: Test authenticated authoring workflows
+        run: pnpm test:browser:authoring
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Build SSR server and public search index
+        run: pnpm build
+
+      - name: Test public redirect privacy
+        run: pnpm test:redirects
+
+      - name: Test historical public slug lifecycle
+        run: pnpm test:public-slug-history
+
+      - name: Test CMS slug ownership
+        run: pnpm test:slug-collisions
+
+      - name: Test revision restoration atomicity
+        run: pnpm test:revision-atomicity
+
+      - name: Test historical revision snapshot validation
+        run: pnpm test:revision-validation
+
+      - name: Test historical revision compatibility
+        run: pnpm test:revision-compatibility
+
+      - name: Test revision restoration slug ownership
+        run: pnpm test:revision-slug-ownership
+
+      - name: Test private publishing boundaries
+        run: pnpm test:console
+
+      - name: Test legacy content importers
+        run: pnpm test:importers
+
+      - name: Test blog publishing boundaries
+        run: pnpm test:blog
+
+      - name: Test backup and recovery tooling
+        run: pnpm test:backup
+
+      - name: Build production container
+        run: docker build -t angefolio:test .

@@ -1,0 +1,1291 @@
+---
+import BentoCard from '../components/astro/BentoCard.astro';
+import AffiliationCard from '../components/astro/AffiliationCard.astro';
+import BentoGrid from '../components/astro/BentoGrid.astro';
+import BlogCard from '../components/astro/BlogCard.astro';
+import Button from '../components/astro/Button.astro';
+import CollectionHeader from '../components/astro/CollectionHeader.astro';
+import IconLink from '../components/astro/IconLink.astro';
+import Layout from '../components/astro/Layout.astro';
+import LabCard from '../components/astro/LabCard.astro';
+import NoteCard from '../components/astro/NoteCard.astro';
+import ProjectCard from '../components/astro/ProjectCard.astro';
+import StackGroup from '../components/astro/StackGroup.astro';
+import HomeProgressRail from '../components/svelte/HomeProgressRail.svelte';
+import PortfolioTerminal from '../components/svelte/PortfolioTerminal.svelte';
+import { contactLinks, nowItems } from '../lib/data/home';
+import { site } from '../lib/data/site';
+import { getHomepageConfig } from '../lib/server/homepage';
+import { getPublicSiteSettings } from '../lib/server/siteSettings';
+import { homeProgressSections } from '../lib/data/homeProgress';
+import { getPublicNoteCatalog } from '../lib/server/notes';
+import { getPublicBlogCatalog } from '../lib/server/blog';
+import { getPublicLabCatalog } from '../lib/server/lab';
+import { getPublicNowStatus } from '../lib/server/now';
+import { getGitHubContributions } from '../lib/server/githubContributions';
+import {
+  getPublicProjectCatalog,
+  publicProjectUrl,
+} from '../lib/server/publicProjects';
+import type {
+  PortfolioTerminalData,
+  TerminalNote,
+  TerminalProject,
+} from '../lib/terminal/types';
+import { selectLatestPublicUpdate } from '../lib/terminal/updates';
+import {
+  credentialTypeLabels,
+  getCredentialSpotlight,
+} from '../lib/data/credentialPresentation';
+
+const [homepage, publicSettings] = await Promise.all([
+  getHomepageConfig(),
+  getPublicSiteSettings(),
+]);
+const liveContactLinks = contactLinks
+  .filter((link) => link.label !== 'Email' || Boolean(publicSettings.email))
+  .map((link) => ({
+    ...link,
+    href:
+      link.label === 'Email'
+        ? `mailto:${publicSettings.email}`
+        : link.label === 'GitHub'
+          ? publicSettings.github
+          : link.href,
+  }));
+const cards = homepage.cards;
+const heroIntroduction = cards.about.visible
+  ? (homepage.aboutParagraphs[0] ?? '')
+  : '';
+const aboutBodyParagraphs =
+  homepage.aboutParagraphs.length > 1
+    ? homepage.aboutParagraphs.slice(1)
+    : homepage.aboutParagraphs;
+const [
+  projectCatalog,
+  publishedNotes,
+  publishedBlog,
+  visibleLab,
+  publicNowStatus,
+  githubContributions,
+] = await Promise.all([
+  getPublicProjectCatalog(),
+  getPublicNoteCatalog(),
+  getPublicBlogCatalog(),
+  getPublicLabCatalog(),
+  getPublicNowStatus(),
+  cards.activity.visible
+    ? getGitHubContributions(publicSettings.github)
+    : Promise.resolve(null),
+]);
+const allProjects = projectCatalog.map((project) => {
+  const detailUrl = publicProjectUrl(project);
+  return {
+    slug: project.slug,
+    href: detailUrl,
+    url: detailUrl,
+    title: project.title,
+    description: project.description,
+    status: project.status,
+    stack: project.stack,
+    links: project.links,
+    github: project.github ?? undefined,
+    demo: project.demo ?? undefined,
+    caseStudy:
+      project.source === 'mdx' ? project.entry?.data.caseStudy : detailUrl,
+    category: project.category ?? undefined,
+    featured: project.featured,
+    cover: project.cover,
+    updatedAt: project.updatedAt.toISOString(),
+  };
+});
+const preview = <T,>(entries: T[], limit: number): T[] =>
+  limit === 0 ? entries : entries.slice(0, limit);
+const featuredProjects = preview(
+  allProjects.filter((project) => project.featured),
+  homepage.projectLimit,
+);
+const featuredNotes = preview(
+  publishedNotes.filter((note) => note.featured),
+  homepage.noteLimit,
+);
+const featuredBlog = preview(
+  publishedBlog.filter((post) => post.featured),
+  homepage.blogLimit,
+);
+const featuredLab = preview(
+  visibleLab.filter((entry) => entry.featured),
+  homepage.labLimit,
+);
+const spotlightCredential = getCredentialSpotlight(homepage.credentials);
+const safeCredentialUrl = (value: string | null): string | undefined => {
+  if (!value) return undefined;
+  try {
+    return new URL(value).protocol === 'https:' ? value : undefined;
+  } catch {
+    return undefined;
+  }
+};
+const showCredentialsCard =
+  homepage.cards.credentials.visible && Boolean(spotlightCredential);
+const showContactCard = homepage.cards.contact.visible;
+const renderedNowItems = publicNowStatus?.items ?? nowItems;
+const nowMetadata = publicNowStatus
+  ? (publicNowStatus.statusNote ??
+    `Updated ${publicNowStatus.updatedAt.toLocaleDateString('en', {
+      dateStyle: 'medium',
+    })}.`)
+  : 'Static fallback.';
+const terminalProjects: TerminalProject[] = allProjects.map(
+  ({ href: _href, caseStudy: _caseStudy, ...project }) => project,
+);
+const terminalNotes: TerminalNote[] = publishedNotes.map((note) => ({
+  slug: note.slug,
+  title: note.title,
+  summary: note.summary ?? note.description,
+  url: `/notes/${note.slug}`,
+  createdAt: note.createdAt.toISOString(),
+  updatedAt: note.updatedAt?.toISOString(),
+}));
+const buildCommit =
+  process.env.RENDER_GIT_COMMIT ??
+  import.meta.env.VERCEL_GIT_COMMIT_SHA ??
+  import.meta.env.CF_PAGES_COMMIT_SHA ??
+  import.meta.env.GITHUB_SHA;
+const buildBranch =
+  import.meta.env.VERCEL_GIT_COMMIT_REF ??
+  import.meta.env.CF_PAGES_BRANCH ??
+  import.meta.env.GITHUB_REF_NAME;
+const buildDate = import.meta.env.BUILD_DATE;
+const latestUpdate = selectLatestPublicUpdate(terminalNotes, terminalProjects);
+const terminalData: PortfolioTerminalData = {
+  name: publicSettings.name,
+  username: 'gamon',
+  hostname: 'gamon-ballz-of-fire',
+  email: publicSettings.email,
+  github: publicSettings.github,
+  repositoryUrl: site.repository,
+  about: homepage.aboutParagraphs.join(' '),
+  nowItems: renderedNowItems,
+  projects: terminalProjects,
+  notes: terminalNotes,
+  socials: liveContactLinks.map((link) => ({
+    label: link.label,
+    url: link.href,
+  })),
+  stack: homepage.stackGroups,
+  routes: {
+    home: '/',
+    projects: '/projects',
+    notes: '/notes',
+    lab: '/lab',
+    search: '/search',
+    contact: '/#contact',
+  },
+  buildCommit,
+  buildBranch,
+  buildDate,
+  latestUpdate,
+  portfolioSince: new Date().getFullYear(),
+};
+const showNowCard = cards.now.visible && renderedNowItems.length > 0;
+const showStackCard = cards.stack.visible;
+const showActivityCard = cards.activity.visible;
+const desktopDashboardSpans = { now: 0, stack: 0, activity: 0 };
+if (showNowCard && showStackCard && showActivityCard) {
+  Object.assign(desktopDashboardSpans, { now: 3, stack: 5, activity: 4 });
+} else if (showNowCard && showStackCard) {
+  Object.assign(desktopDashboardSpans, { now: 4, stack: 8 });
+} else if (showNowCard && showActivityCard) {
+  Object.assign(desktopDashboardSpans, { now: 8, activity: 4 });
+} else if (showStackCard && showActivityCard) {
+  Object.assign(desktopDashboardSpans, { stack: 8, activity: 4 });
+} else if (showNowCard) {
+  desktopDashboardSpans.now = 12;
+} else if (showStackCard) {
+  desktopDashboardSpans.stack = 12;
+} else if (showActivityCard) {
+  desktopDashboardSpans.activity = 12;
+}
+const progressSections = homeProgressSections.filter((section) => {
+  if (section.id === 'introduction') return true;
+  if (section.id === 'featured-projects')
+    return cards.projects.visible && featuredProjects.length > 0;
+  if (section.id === 'current-focus') return showNowCard || showStackCard;
+  if (section.id === 'github-activity') return showActivityCard;
+  if (section.id === 'latest-notes')
+    return cards.notes.visible && featuredNotes.length > 0;
+  if (section.id === 'featured-blog')
+    return cards.blog.visible && featuredBlog.length > 0;
+  if (section.id === 'featured-lab')
+    return cards.lab.visible && featuredLab.length > 0;
+  if (section.id === 'contact') return cards.contact.visible;
+  return false;
+});
+---
+
+<Layout
+  title={`${publicSettings.name} — ${publicSettings.siteName}`}
+  description={publicSettings.seoDescription}
+  siteSettings={publicSettings}
+>
+  <HomeProgressRail client:load sections={progressSections} />
+  <CollectionHeader active="home" />
+  <BentoGrid class="homepage-grid">
+    <div
+      id="introduction"
+      class:list={[
+        'desktop-introduction-grid home-anchor md:col-span-2 lg:col-span-12',
+        cards.about.visible ? 'has-about' : 'without-about',
+      ]}
+    >
+      <BentoCard class="hero subtle-grid" accent="strong">
+        <div class="desktop-profile-stack">
+          <BentoCard class="desktop-profile-tile subtle-grid" accent="strong">
+            <div class="hero-intro">
+              <div class="hero-copy">
+                <h1 class="hero-heading text-balance">{homepage.heroName}</h1>
+                {
+                  heroIntroduction && (
+                    <p class="hero-summary">{heroIntroduction}</p>
+                  )
+                }
+                <div class="actions">
+                  <Button href="/projects" variant="primary">Projects</Button>
+                  <Button href="/blog" variant="ghost">Journal</Button>
+                  {
+                    cards.about.visible && (
+                      <Button href="#about" variant="ghost">
+                        About
+                      </Button>
+                    )
+                  }
+                  {
+                    publicSettings.email && (
+                      <Button
+                        href={'mailto:' + publicSettings.email}
+                        variant="ghost"
+                      >
+                        Email
+                      </Button>
+                    )
+                  }
+                </div>
+              </div>
+              <figure class="hero-portrait">
+                {
+                  homepage.portrait ? (
+                    <img
+                      src={homepage.portrait}
+                      alt={publicSettings.name}
+                      width="456"
+                      height="487"
+                      loading="eager"
+                      decoding="async"
+                      fetchpriority="high"
+                      class="hero-portrait-image"
+                    />
+                  ) : (
+                    <div class="hero-portrait-image hero-portrait-placeholder">
+                      <span aria-hidden="true">✳</span>
+                      <span>portrait to come</span>
+                    </div>
+                  )
+                }
+                <figcaption class="hero-portrait-titlebar">
+                  <span class="hero-portrait-filename">Gamon/Elio Sawada</span>
+                </figcaption>
+              </figure>
+            </div>
+          </BentoCard>
+          <BentoCard class="desktop-terminal-tile">
+            <PortfolioTerminal client:load data={terminalData} />
+          </BentoCard>
+        </div>
+      </BentoCard>
+
+      {
+        cards.about.visible && (
+          <BentoCard
+            id="about"
+            class="about"
+            accent="soft"
+            eyebrow={cards.about.eyebrow}
+            title={cards.about.title}
+          >
+            {aboutBodyParagraphs.map((paragraph) => (
+              <p>{paragraph}</p>
+            ))}
+            {homepage.affiliations.length > 0 && (
+              <section
+                class="about-affiliations"
+                aria-label="Education and affiliations"
+              >
+                <h3>Education &amp; Involvement</h3>
+                <ul class="about-affiliation-list" data-affiliation-gallery>
+                  {homepage.affiliations.map((affiliation, index) => (
+                    <AffiliationCard affiliation={affiliation} index={index} />
+                  ))}
+                </ul>
+              </section>
+            )}
+          </BentoCard>
+        )
+      }
+    </div>
+    {
+      cards.projects.visible && featuredProjects.length > 0 && (
+        <BentoCard
+          id="featured-projects"
+          class="projects home-anchor md:col-span-2 lg:col-span-12"
+          accent="strong"
+          eyebrow={cards.projects.eyebrow}
+          title={cards.projects.title}
+          description={cards.projects.description}
+        >
+          <div class="project-grid">
+            {featuredProjects.map((project) => (
+              <ProjectCard
+                href={project.href}
+                title={project.title}
+                description={project.description}
+                status={project.status}
+                stack={project.stack}
+                github={project.github}
+                demo={project.demo}
+                caseStudy={project.caseStudy}
+                category={project.category}
+                featured={project.featured}
+                cover={project.cover}
+                links={project.links}
+                context="home"
+              />
+            ))}
+          </div>
+          <div class="card-footer">
+            <IconLink href="/projects" label="View all projects" />
+          </div>
+        </BentoCard>
+      )
+    }
+    {
+      showNowCard && (
+        <BentoCard
+          id="current-focus"
+          class="now home-anchor md:col-span-1 dashboard-card"
+          style={`--dashboard-span: ${desktopDashboardSpans.now}`}
+          accent="medium"
+          eyebrow={cards.now.eyebrow}
+          title={cards.now.title}
+          description={cards.now.description || undefined}
+        >
+          <ul class="status-list">
+            {renderedNowItems.map((item) => (
+              <li>{item}</li>
+            ))}
+          </ul>
+          <p class="metadata">{nowMetadata}</p>
+        </BentoCard>
+      )
+    }
+
+    {
+      showStackCard && (
+        <BentoCard
+          id={!showNowCard ? 'current-focus' : undefined}
+          class="stack md:col-span-1 dashboard-card"
+          style={`--dashboard-span: ${desktopDashboardSpans.stack}`}
+          accent="soft"
+          eyebrow={cards.stack.eyebrow}
+          title={cards.stack.title}
+          description={cards.stack.description || undefined}
+        >
+          <div class="stack-groups">
+            {homepage.stackGroups.map((group) => (
+              <StackGroup title={group.title} items={group.items} />
+            ))}
+          </div>
+        </BentoCard>
+      )
+    }
+
+    {
+      showActivityCard && (
+        <BentoCard
+          id="github-activity"
+          class="github home-anchor md:col-span-2 dashboard-card"
+          style={`--dashboard-span: ${desktopDashboardSpans.activity}`}
+          accent="medium"
+          eyebrow={cards.activity.eyebrow}
+          title={cards.activity.title}
+        >
+          <p>{cards.activity.description}</p>
+          {githubContributions ? (
+            <>
+              <div
+                class="contribution-scroll"
+                role="img"
+                aria-label={`GitHub reports ${githubContributions.total}. Contribution activity for the past year.`}
+              >
+                <div class="contribution-grid" aria-hidden="true">
+                  {githubContributions.days.map((day) => (
+                    <span
+                      class={`level-${day.level}`}
+                      style={`grid-column: ${day.week + 1}; grid-row: ${day.weekday + 1};`}
+                      title={`${day.date}: activity level ${day.level} of 4`}
+                    />
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : (
+            <p class="activity-unavailable">
+              GitHub contribution activity is temporarily unavailable.
+            </p>
+          )}
+          <div class="activity-meta" aria-label="GitHub profile">
+            <span>
+              {new URL(publicSettings.github).pathname.replaceAll('/', '')}
+            </span>
+            {githubContributions && <span>{githubContributions.total}</span>}
+          </div>
+          <IconLink href={publicSettings.github} label="GitHub" external />
+        </BentoCard>
+      )
+    }
+    {
+      cards.notes.visible && featuredNotes.length > 0 && (
+        <BentoCard
+          id="latest-notes"
+          class="notes home-anchor md:col-span-2 lg:col-span-8"
+          accent="soft"
+          eyebrow={cards.notes.eyebrow}
+          title={cards.notes.title}
+          description={cards.notes.description || undefined}
+        >
+          <div class="note-grid">
+            {featuredNotes.map((note) => (
+              <NoteCard
+                href={`/notes/${note.slug}`}
+                title={note.title}
+                description={note.summary ?? note.description}
+                category={note.category}
+                tags={note.tags}
+                createdAt={note.createdAt}
+                updatedAt={note.updatedAt ?? undefined}
+                featured={note.featured}
+                context="home"
+              />
+            ))}
+          </div>
+          <div class="card-footer">
+            <IconLink href="/notes" label="Read notes" />
+          </div>
+        </BentoCard>
+      )
+    }
+    {
+      cards.blog.visible && featuredBlog.length > 0 && (
+        <BentoCard
+          id="featured-blog"
+          class="blog home-anchor md:col-span-1 lg:col-span-6"
+          accent="soft"
+          eyebrow={cards.blog.eyebrow}
+          title={cards.blog.title}
+          description={cards.blog.description || undefined}
+        >
+          <div class="blog-preview-grid">
+            {featuredBlog.map((post) => (
+              <BlogCard
+                href={`/blog/${post.slug}`}
+                title={post.title}
+                description={post.description}
+                summary={post.summary}
+                cover={post.cover}
+                category={post.category}
+                tags={post.tags}
+                createdAt={post.createdAt}
+                updatedAt={post.updatedAt}
+                featured={post.featured}
+                context="home"
+              />
+            ))}
+          </div>
+          <div class="card-footer">
+            <IconLink href="/blog" label="Read journal" />
+          </div>
+        </BentoCard>
+      )
+    }
+    {
+      cards.lab.visible && featuredLab.length > 0 && (
+        <BentoCard
+          id="featured-lab"
+          class="lab home-anchor md:col-span-1 lg:col-span-6"
+          accent="soft"
+          eyebrow={cards.lab.eyebrow}
+          title={cards.lab.title}
+          description={cards.lab.description || undefined}
+        >
+          <div class="lab-preview-grid">
+            {featuredLab.map((entry) => (
+              <LabCard
+                href={`/lab/${entry.slug}`}
+                title={entry.title}
+                description={entry.description}
+                status={entry.status}
+                category={entry.category ?? undefined}
+                tags={entry.tags}
+                tools={entry.tools}
+                date={entry.date}
+                featured={entry.featured}
+                context="home"
+              />
+            ))}
+          </div>
+          <div class="card-footer">
+            <IconLink href="/lab" label="Explore Lab" />
+          </div>
+        </BentoCard>
+      )
+    }
+
+    {
+      showCredentialsCard && (
+        <BentoCard
+          class="credentials md:col-span-2 dashboard-card"
+          style={`--dashboard-span: ${showContactCard ? 8 : 12}`}
+          accent="soft"
+          eyebrow={cards.credentials.eyebrow}
+          title={cards.credentials.title}
+        >
+          <div class="credential-spotlight">
+            {spotlightCredential?.image && (
+              <div class="credential-spotlight-art">
+                <img
+                  src={spotlightCredential.image}
+                  alt={`${spotlightCredential.title} badge artwork`}
+                  width="120"
+                  height="120"
+                  loading="lazy"
+                />
+              </div>
+            )}
+            <div class="credential-spotlight-copy">
+              <h3>{spotlightCredential?.title}</h3>
+              <p>{spotlightCredential?.issuer}</p>
+              {spotlightCredential && (
+                <span class="credential-type">
+                  {credentialTypeLabels[spotlightCredential.type]}
+                </span>
+              )}
+              {spotlightCredential &&
+                safeCredentialUrl(spotlightCredential.verificationUrl) && (
+                  <a
+                    class="credential-verify"
+                    href={safeCredentialUrl(
+                      spotlightCredential.verificationUrl,
+                    )}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    View credential ↗
+                  </a>
+                )}
+            </div>
+          </div>
+          <div class="credential-spotlight-footer">
+            <a href="/credentials">All credentials →</a>
+          </div>
+        </BentoCard>
+      )
+    }
+
+    {
+      showContactCard && (
+        <BentoCard
+          id="contact"
+          class:list={[
+            'contact home-anchor md:col-span-2',
+            showCredentialsCard ? 'lg:col-span-4' : 'lg:col-span-12',
+          ]}
+          accent="strong"
+          eyebrow={cards.contact.eyebrow}
+          title={cards.contact.title}
+        >
+          <p>{cards.contact.description}</p>
+          <div class="contact-links">
+            {liveContactLinks.map((link) => (
+              <IconLink
+                href={link.href}
+                label={link.label}
+                external={link.external}
+              />
+            ))}
+          </div>
+          {publicSettings.email && (
+            <p class="contact-email">{publicSettings.email}</p>
+          )}
+        </BentoCard>
+      )
+    }
+  </BentoGrid>
+</Layout>
+<style>
+  .desktop-introduction-grid {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+  }
+  .actions {
+    display: flex;
+    align-items: center;
+  }
+  :global(.homepage-grid) {
+    align-items: stretch;
+    gap: clamp(0.9rem, 2vw, 1.35rem);
+  }
+  :global(.homepage-grid .bento-card) {
+    box-shadow: 3px 4px 0 color-mix(in srgb, var(--border) 48%, transparent);
+  }
+  :global(.homepage-grid .hero),
+  :global(.homepage-grid .desktop-profile-tile) {
+    background-color: var(--card);
+    background-image:
+      linear-gradient(
+        color-mix(in srgb, var(--border) 28%, transparent) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--border) 28%, transparent) 1px,
+        transparent 1px
+      );
+    background-size: 32px 32px;
+  }
+  :global(.homepage-grid .about) {
+    background: color-mix(in srgb, var(--card) 86%, var(--sage));
+  }
+  :global(.homepage-grid .about::after) {
+    position: absolute;
+    top: 0.8rem;
+    right: 1rem;
+    width: 1.3rem;
+    height: 1.3rem;
+    border-top: 2px solid var(--accent);
+    border-right: 2px solid var(--accent);
+    content: '';
+    opacity: 0.7;
+    pointer-events: none;
+  }
+  :global(.homepage-grid .now) {
+    background: color-mix(in srgb, var(--card) 74%, var(--sage));
+  }
+  :global(.homepage-grid .now::after) {
+    position: absolute;
+    top: 0.85rem;
+    right: 1rem;
+    width: 0.7rem;
+    height: 0.7rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 2px 0 color-mix(in srgb, var(--charcoal) 30%, transparent);
+    content: '';
+    pointer-events: none;
+  }
+  :global(.homepage-grid .stack) {
+    background: color-mix(in srgb, var(--card) 90%, var(--sage));
+  }
+  :global(.homepage-grid .projects),
+  :global(.homepage-grid .notes),
+  :global(.homepage-grid .blog),
+  :global(.homepage-grid .lab) {
+    background-image: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--sage) 9%, transparent),
+      transparent 38%
+    );
+  }
+  :global(.homepage-grid .projects > header),
+  :global(.homepage-grid .notes > header),
+  :global(.homepage-grid .blog > header),
+  :global(.homepage-grid .lab > header) {
+    padding-bottom: 0.8rem;
+    border-bottom: 1px dashed var(--border);
+  }
+  :global(.hero) {
+    display: flex;
+    flex-direction: column;
+  }
+  .hero-intro {
+    display: grid;
+    grid-template-columns: clamp(10.5rem, 20vw, 13rem) minmax(0, 1fr);
+    align-items: start;
+    gap: clamp(1.5rem, 3vw, 2.5rem);
+  }
+  .hero-portrait {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 13rem;
+    aspect-ratio: 4 / 5;
+    margin: 0;
+    overflow: hidden;
+    padding: 0.4rem;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--card);
+    box-shadow: 2px 3px 0 color-mix(in srgb, var(--border) 55%, transparent);
+    transform: rotate(1.5deg);
+  }
+  .hero-portrait-titlebar {
+    display: flex;
+    min-height: 1.8rem;
+    align-items: center;
+    justify-content: center;
+    padding-inline: 0.3rem;
+    color: var(--muted-foreground);
+  }
+  .hero-portrait-filename {
+    min-width: 0;
+    color: var(--muted-foreground);
+    font: 700 0.8rem var(--type-ui);
+    letter-spacing: 0.02em;
+    overflow-wrap: anywhere;
+    text-align: center;
+  }
+  .hero-portrait-image {
+    display: block;
+    width: 100%;
+    min-height: 0;
+    flex: 1;
+    object-fit: cover;
+    object-position: center;
+    border-radius: 2px;
+    background: var(--surface-muted);
+  }
+  .hero-portrait-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    padding: 0.5rem;
+    color: var(--foreground);
+    font: 0.7rem/1.4 var(--type-ui);
+    text-align: center;
+  }
+  .hero-portrait-placeholder span:first-child {
+    color: var(--accent-text);
+    font-size: 2.25rem;
+    line-height: 1;
+  }
+  .hero-copy {
+    min-width: 0;
+  }
+  .hero-heading {
+    max-width: 18ch;
+    margin: 0 0 0.85rem;
+    font-size: clamp(2.25rem, 5vw, 3.5rem);
+    line-height: 1.15;
+    letter-spacing: 0.01em;
+  }
+  .hero-summary {
+    max-width: 58ch;
+    margin: 0;
+    color: var(--foreground);
+    font: 1rem/1.65 var(--type-body);
+  }
+  @media (min-width: 768px) and (max-width: 1023px) {
+    .hero-intro {
+      grid-template-areas: 'portrait copy';
+    }
+    .hero-portrait {
+      grid-area: portrait;
+    }
+    .hero-copy {
+      grid-area: copy;
+    }
+  }
+  :global(.home-anchor) {
+    scroll-margin-top: clamp(1.5rem, 4vw, 3rem);
+  }
+  .about p,
+  .github > p,
+  .contact > p {
+    color: var(--muted-foreground);
+  }
+  .actions {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .actions {
+    margin-top: 1.2rem;
+  }
+  @media (min-width: 1024px) {
+    .desktop-introduction-grid.has-about {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: start;
+    }
+    :global(.desktop-introduction-grid.without-about) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    :global(.desktop-introduction-grid > .hero) {
+      display: contents;
+    }
+    :global(.desktop-introduction-grid > .hero::before) {
+      display: none;
+    }
+    .desktop-profile-stack {
+      display: grid;
+      min-width: 0;
+      grid-template-columns: minmax(0, 1fr);
+      align-content: start;
+      gap: 1rem;
+    }
+    :global(
+      .desktop-introduction-grid .desktop-profile-stack > .desktop-profile-tile
+    ) {
+      padding: 1.25rem;
+    }
+    :global(
+      .desktop-introduction-grid .desktop-profile-stack > .desktop-terminal-tile
+    ) {
+      padding: 0.875rem;
+    }
+    :global(.desktop-terminal-tile .terminal-preview) {
+      margin-top: 0;
+    }
+    :global(.desktop-introduction-grid > .about) {
+      align-self: start;
+      min-width: 0;
+    }
+    :global(.homepage-grid .dashboard-card) {
+      grid-column: span var(--dashboard-span);
+    }
+    .hero-intro {
+      grid-template-columns: minmax(0, 1fr) minmax(9.375rem, 11.875rem);
+      grid-template-areas: 'copy portrait';
+      align-items: start;
+      gap: clamp(0.75rem, 1.6vw, 1.25rem);
+    }
+    .hero-copy {
+      grid-area: copy;
+    }
+    .hero-portrait {
+      grid-area: portrait;
+      justify-self: end;
+    }
+    .hero-heading {
+      max-width: 13ch;
+      margin-bottom: 0.75rem;
+      font-size: clamp(2.5rem, 3.4vw, 3rem);
+      line-height: 1.12;
+    }
+    .actions {
+      gap: 0.625rem;
+      margin-top: 1rem;
+    }
+    .actions :global(.button) {
+      min-height: 2.65rem;
+    }
+  }
+  :global(.bento-card.about > header) {
+    margin-bottom: 1.375rem;
+  }
+  :global(.bento-card.about > p) {
+    margin: 0;
+    line-height: 1.7;
+  }
+  :global(.bento-card.about > p + p) {
+    margin-top: 1.125rem;
+  }
+  .about-affiliations {
+    display: grid;
+    gap: 0.6rem;
+    margin-top: 1.625rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--border);
+  }
+  .about-affiliations h3 {
+    margin: 0;
+    color: var(--accent-text);
+    font: 0.68rem/1.55 var(--font-mono);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .about-affiliation-list {
+    display: flex;
+    max-width: 100%;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: clamp(0.875rem, 1.1vw, 1rem);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  @media (max-width: 1023px) {
+    :global(.hero .desktop-profile-stack) {
+      display: block;
+    }
+    :global(.hero .desktop-profile-stack > .desktop-profile-tile),
+    :global(.hero .desktop-profile-stack > .desktop-terminal-tile) {
+      overflow: visible;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+      transition: none;
+    }
+    :global(.hero .desktop-profile-stack > .desktop-profile-tile::before),
+    :global(.hero .desktop-profile-stack > .desktop-terminal-tile::before) {
+      display: none;
+    }
+  }
+  .project-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 1rem;
+  }
+  :global(.project-grid .content-card),
+  :global(.note-grid .content-card),
+  :global(.feature-grid .content-card) {
+    border-radius: var(--radius-md);
+    box-shadow: none;
+  }
+  .card-footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--border);
+  }
+  .status-list {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .status-list li {
+    position: relative;
+    padding-left: 1rem;
+    color: var(--foreground);
+    font-size: 0.98rem;
+    line-height: 1.5;
+  }
+  .status-list li::before {
+    position: absolute;
+    top: 0.65em;
+    left: 0;
+    width: 0.35rem;
+    height: 1px;
+    background: var(--accent);
+    content: '';
+  }
+  .metadata,
+  .activity-meta,
+  .contact-email {
+    color: var(--muted-foreground);
+    font: 0.65rem var(--font-mono);
+  }
+  .metadata {
+    margin: 1.25rem 0 0;
+  }
+  .stack-groups {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.8rem;
+  }
+  :global(.stack-groups .stack-group) {
+    min-width: 0;
+    padding: 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--card);
+  }
+  :global(.stack-groups .stack-group:nth-child(even)) {
+    background: var(--surface-muted);
+  }
+  :global(.stack-groups .stack-group h3) {
+    color: var(--foreground);
+  }
+  .credential-spotlight {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 1rem;
+  }
+  .credential-spotlight-art {
+    display: grid;
+    width: 8rem;
+    height: 8rem;
+    flex: 0 0 8rem;
+    place-items: center;
+    padding: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--muted);
+  }
+  .credential-spotlight-art img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: var(--radius-sm);
+    background: var(--pale-sage);
+  }
+  .credential-spotlight-copy {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.4rem;
+  }
+  .credential-spotlight-copy h3 {
+    margin: 0;
+    color: var(--foreground);
+    font: 600 1rem/1.45 var(--type-ui);
+    overflow-wrap: anywhere;
+  }
+  .credential-spotlight-copy p {
+    margin: 0;
+    color: var(--muted-foreground);
+    font: 0.82rem/1.45 var(--type-ui);
+  }
+  .credential-type {
+    color: var(--subtle-foreground);
+    font: 0.7rem/1.4 var(--font-mono);
+  }
+  .credential-verify,
+  .credential-spotlight-footer a {
+    color: var(--accent-text);
+    font: 0.72rem/1.45 var(--font-mono);
+    text-decoration: underline;
+    text-underline-offset: 0.18em;
+  }
+  .credential-verify:focus-visible,
+  .credential-spotlight-footer a:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+  .credential-spotlight-footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+  }
+  .contribution-grid {
+    display: grid;
+    grid-template-columns: repeat(53, minmax(0, 1fr));
+    grid-template-rows: repeat(7, minmax(0, 1fr));
+    gap: 0.22rem;
+    min-width: 24rem;
+    margin: 1.1rem 0;
+  }
+  .contribution-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  .contribution-grid span {
+    aspect-ratio: 1;
+    min-width: 0;
+    border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+    border-radius: 2px;
+    background: var(--muted);
+  }
+  .contribution-grid .level-1 {
+    background: color-mix(in srgb, var(--accent) 18%, var(--muted));
+  }
+  .contribution-grid .level-2 {
+    background: color-mix(in srgb, var(--accent) 35%, var(--muted));
+  }
+  .contribution-grid .level-3 {
+    background: color-mix(in srgb, var(--accent) 58%, var(--muted));
+  }
+  .contribution-grid .level-4 {
+    background: color-mix(in srgb, var(--accent) 82%, var(--muted));
+  }
+  .activity-meta {
+    display: grid;
+    gap: 0.25rem;
+    margin-bottom: 1rem;
+  }
+  .activity-unavailable {
+    margin: 1rem 0;
+    color: var(--muted-foreground);
+    font-size: 0.85rem;
+  }
+  .note-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+    gap: 0.8rem;
+  }
+  .blog-preview-grid,
+  .lab-preview-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.8rem;
+  }
+  :global(.homepage-grid .content-card.home-preview) {
+    border-radius: var(--radius-sm);
+    box-shadow: 2px 2px 0 color-mix(in srgb, var(--border) 42%, transparent);
+  }
+  .contact-links {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin: 1.4rem 0;
+  }
+  .contact-email {
+    overflow-wrap: anywhere;
+  }
+  @media (min-width: 768px) {
+    .project-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 767px) {
+    .desktop-introduction-grid {
+      gap: 0.75rem;
+    }
+    :global(.container-shell .bento-card.about > header) {
+      margin-bottom: 1.25rem;
+    }
+    :global(.bento-card.about > p + p) {
+      margin-top: 0.875rem;
+    }
+    :global(.hero) {
+      min-height: 0;
+    }
+    .hero-intro {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas:
+        'heading'
+        'portrait'
+        'summary'
+        'actions';
+      align-items: start;
+      gap: 0.75rem;
+    }
+    .hero-copy {
+      display: contents;
+    }
+    .hero-heading {
+      grid-area: heading;
+      max-width: none;
+      margin: 0;
+      font-size: clamp(1.625rem, 7.2vw, 1.875rem);
+      line-height: 1.16;
+      letter-spacing: 0;
+      overflow-wrap: anywhere;
+    }
+    .actions {
+      grid-area: actions;
+      margin-top: 0;
+      gap: 0.5rem;
+    }
+    .hero-summary {
+      grid-area: summary;
+      font-size: 0.96rem;
+    }
+    .hero-portrait {
+      grid-area: portrait;
+      width: min(55vw, 11.5rem);
+      max-width: 11.5rem;
+      aspect-ratio: 4 / 5;
+      justify-self: start;
+      align-self: start;
+    }
+    .hero-portrait-titlebar {
+      min-height: 1.45rem;
+      padding-inline: 0.15rem;
+    }
+    .hero-portrait-filename {
+      font-size: 0.75rem;
+    }
+    .actions :global(.button) {
+      min-height: 2.75rem;
+      padding: 0.55rem 0.8rem;
+      font-size: 0.82rem;
+    }
+    .note-grid,
+    .blog-preview-grid,
+    .lab-preview-grid {
+      grid-template-columns: 1fr;
+      gap: 0.65rem;
+    }
+    .stack-groups {
+      gap: 0.75rem;
+    }
+    .credential-spotlight {
+      gap: 0.75rem;
+    }
+    .credential-spotlight-art {
+      width: 5.5rem;
+      height: 5.5rem;
+      flex-basis: 5.5rem;
+      padding: 0.35rem;
+    }
+    .credential-spotlight-copy h3 {
+      font-size: 0.88rem;
+    }
+    .credential-spotlight-copy p {
+      font-size: 0.76rem;
+    }
+    .about p,
+    .github > p,
+    .contact > p,
+    .status-list li {
+      font-size: 0.96rem;
+      line-height: 1.55;
+    }
+    .about-affiliations {
+      gap: 0.5rem;
+      margin-top: 1.5rem;
+      padding-top: 0.7rem;
+    }
+    .about-affiliation-list {
+      gap: clamp(0.625rem, 3vw, 0.75rem);
+    }
+    .contact-links {
+      gap: 0.5rem;
+      margin: 0.9rem 0;
+    }
+    .contribution-grid {
+      min-width: 27rem;
+      gap: 0.18rem;
+      margin-block: 0.75rem;
+    }
+    .contribution-scroll {
+      overscroll-behavior-inline: contain;
+      scrollbar-color: var(--border-strong) transparent;
+      scrollbar-width: thin;
+    }
+    .activity-meta,
+    .metadata,
+    .contact-email {
+      font-size: 0.72rem;
+    }
+    :global(.homepage-grid) {
+      gap: 0.75rem;
+    }
+  }
+  @media (max-width: 359px) {
+    .hero-heading {
+      font-size: 1.55rem;
+    }
+    .stack-groups {
+      grid-template-columns: 1fr;
+    }
+    .credential-spotlight-art {
+      width: 4.5rem;
+      height: 4.5rem;
+      flex-basis: 4.5rem;
+    }
+  }
+</style>

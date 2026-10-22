@@ -1,0 +1,93 @@
+---
+import ArchiveIntro from '../../components/astro/ArchiveIntro.astro';
+import CardGrid from '../../components/astro/CardGrid.astro';
+import CollectionHeader from '../../components/astro/CollectionHeader.astro';
+import Layout from '../../components/astro/Layout.astro';
+import NoteCard from '../../components/astro/NoteCard.astro';
+import Tag from '../../components/astro/Tag.astro';
+import { formatPageTitle } from '../../lib/data/pageTitle';
+import { getPublicNoteCatalog } from '../../lib/server/notes';
+import { getPublicSiteSettings } from '../../lib/server/siteSettings';
+
+export const prerender = false;
+const [notes, settings] = await Promise.all([
+  getPublicNoteCatalog(),
+  getPublicSiteSettings(),
+]);
+const categories = [...new Set(notes.map((note) => note.category))].sort();
+const tags = [...new Set(notes.flatMap((note) => note.tags))].sort();
+---
+
+<Layout title={formatPageTitle('Notes', settings.name)} siteSettings={settings}>
+  <CollectionHeader active="notes" />
+  <ArchiveIntro
+    id="notes-title"
+    path="/notes"
+    title="Notes"
+    count={`${notes.length} published`}
+    asideTitle="Thoughts, observations, and little notes"
+  >
+    {
+      notes.length > 0 && (
+        <div class="archive-topic">
+          <>
+            <strong>Categories</strong>
+            <p>{categories.join(', ')}</p>
+          </>
+        </div>
+      )
+    }
+    {
+      notes.length > 0 && (
+        <div class="archive-topic">
+          <>
+            <strong>Tags</strong>
+            <div class="archive-tags">
+              {tags.map((tag) => (
+                <Tag>{tag}</Tag>
+              ))}
+            </div>
+          </>
+        </div>
+      )
+    }
+  </ArchiveIntro>
+  <section aria-label="Notes archive">
+    {
+      notes.length ? (
+        <CardGrid class="collection-grid">
+          {notes.map((note) => (
+            <NoteCard
+              href={`/notes/${note.slug}`}
+              title={note.title}
+              description={note.summary ?? note.description}
+              category={note.category}
+              tags={note.tags}
+              createdAt={note.createdAt}
+              updatedAt={note.updatedAt ?? undefined}
+              featured={note.featured}
+              context="archive"
+            />
+          ))}
+        </CardGrid>
+      ) : (
+        <p class="empty-state">No published notes yet.</p>
+      )
+    }
+  </section>
+</Layout>
+<style>
+  :global(.collection-grid .content-card) {
+    height: 100%;
+    border-radius: var(--radius-md);
+    box-shadow: none;
+  }
+  .empty-state {
+    margin: 0;
+    padding: 2rem;
+    border: 1px dashed var(--border);
+    background: var(--card);
+    color: var(--muted-foreground);
+    font: 1rem/1.65 var(--type-body);
+  }
+</style>

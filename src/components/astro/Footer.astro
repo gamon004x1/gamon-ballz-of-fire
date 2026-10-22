@@ -1,0 +1,53 @@
+---
+import IconLink from './IconLink.astro';
+
+interface Props {
+  name: string;
+  github: string;
+  rss: string;
+}
+const { name, github, rss } = Astro.props;
+---
+
+<footer class="container-shell">
+  <p>
+    A personal corner for {name}. An original character project built on
+    Angefolio.
+  </p>
+  <nav aria-label="Footer navigation">
+    <IconLink href="/search" label="Search" />
+    <IconLink href={rss} label="RSS" />
+    <IconLink href={github} label="GitHub" external />
+  </nav>
+</footer>
+<style>
+  footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-block: 1.4rem 2.5rem;
+    border-top: 1px solid var(--border);
+    color: var(--muted-foreground);
+    font: 0.875rem/1.6 var(--type-body);
+  }
+  footer p {
+    margin: 0;
+  }
+  nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.9rem;
+  }
+  @media (max-width: 767px) {
+    footer {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 0.65rem;
+      padding-block: 1rem 1.5rem;
+    }
+    footer span {
+      display: block;
+      margin-top: 0.25rem;
+    }
+  }
+</style>

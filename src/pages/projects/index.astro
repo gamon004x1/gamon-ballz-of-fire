@@ -1,0 +1,104 @@
+---
+import ArchiveIntro from '../../components/astro/ArchiveIntro.astro';
+import CardGrid from '../../components/astro/CardGrid.astro';
+import CollectionHeader from '../../components/astro/CollectionHeader.astro';
+import Layout from '../../components/astro/Layout.astro';
+import ProjectCard from '../../components/astro/ProjectCard.astro';
+import { formatPageTitle } from '../../lib/data/pageTitle';
+import {
+  getPublicProjectCatalog,
+  publicProjectUrl,
+} from '../../lib/server/publicProjects';
+import { getPublicSiteSettings } from '../../lib/server/siteSettings';
+
+const [catalog, settings] = await Promise.all([
+  getPublicProjectCatalog(),
+  getPublicSiteSettings(),
+]);
+const projects = catalog.map((project) => {
+  const detailUrl = publicProjectUrl(project);
+  return {
+    href: detailUrl,
+    title: project.title,
+    description: project.description,
+    status: project.status,
+    category: project.category ?? undefined,
+    stack: project.stack,
+    links: project.links,
+    github: project.github ?? undefined,
+    demo: project.demo ?? undefined,
+    caseStudy:
+      project.source === 'mdx' ? project.entry?.data.caseStudy : detailUrl,
+    featured: project.featured,
+    cover: project.cover,
+  };
+});
+---
+
+<Layout
+  title={formatPageTitle('Projects', settings.name)}
+  siteSettings={settings}
+>
+  <CollectionHeader active="projects" />
+  <ArchiveIntro
+    id="projects-title"
+    path="/projects"
+    title="Projects"
+    count={`${projects.length} visible`}
+  />
+  <section aria-label="Project archive">
+    {
+      projects.length > 0 ? (
+        <CardGrid class="collection-grid project-archive-grid">
+          {projects.map((project) => (
+            <ProjectCard
+              href={project.href}
+              title={project.title}
+              description={project.description}
+              status={project.status}
+              category={project.category}
+              stack={project.stack}
+              github={project.github}
+              demo={project.demo}
+              caseStudy={project.caseStudy}
+              featured={project.featured}
+              cover={project.cover}
+              links={project.links}
+              context="archive"
+            />
+          ))}
+        </CardGrid>
+      ) : (
+        <p class="empty-state">No visible projects yet.</p>
+      )
+    }
+  </section>
+</Layout>
+
+<style>
+  :global(.collection-grid .content-card) {
+    height: 100%;
+    border-radius: var(--radius-md);
+    box-shadow: none;
+  }
+  :global(.project-archive-grid.collection-grid) {
+    align-items: start;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  :global(.project-archive-grid .content-card) {
+    height: auto;
+  }
+  @media (max-width: 767px) {
+    :global(.project-archive-grid.collection-grid) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+  .empty-state {
+    margin: 0;
+    padding: 2rem;
+    border: 1px dashed var(--border);
+    background: var(--card);
+    color: var(--muted-foreground);
+    font: 1rem/1.65 var(--type-body);
+  }
+</style>

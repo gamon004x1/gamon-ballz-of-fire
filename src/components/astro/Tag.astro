@@ -1,0 +1,44 @@
+---
+interface Props {
+  tone?: 'neutral' | 'accent' | 'strong' | 'danger';
+  class?: string;
+}
+const { tone = 'neutral', class: className = '' } = Astro.props;
+---
+
+<span class:list={['tag', `tone-${tone}`, className]}><slot /></span>
+<style>
+  .tag {
+    --tag-background: var(--muted);
+    --tag-border: var(--border);
+    --tag-foreground: var(--muted-foreground);
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.65rem;
+    padding: 0.16rem 0.5rem;
+    border: 1px solid var(--tag-border);
+    border-radius: 999px;
+    background: var(--tag-background);
+    color: var(--tag-foreground);
+    font: 500 0.72rem/1.25 var(--type-ui);
+    letter-spacing: 0.02em;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    text-align: left;
+  }
+  .tone-accent {
+    --tag-background: var(--accent-soft);
+    --tag-border: color-mix(in srgb, var(--accent) 48%, var(--border));
+    --tag-foreground: var(--accent-text);
+  }
+  .tone-strong {
+    --tag-background: var(--accent-hover);
+    --tag-border: var(--accent-hover);
+    --tag-foreground: var(--accent-foreground);
+  }
+  .tone-danger {
+    --tag-background: var(--danger);
+    --tag-border: var(--danger);
+    --tag-foreground: var(--danger-foreground);
+  }
+</style>
