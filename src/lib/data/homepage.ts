@@ -81,7 +81,7 @@ export const defaultHomepageConfig: HomepageConfig = {
   ],
   portrait: '/images/gamon-elio-portrait.jpeg',
   aboutParagraphs: [
-    "welcome to my little corner of the internet. i like tokusatsu, video games, anime, collecting things, and making stuff whenever i feel like it. you'll probably find a little bit of everything here.",
+    "HEY!! i'm gamon (elio works too hehe). welcome to my very own little corner of the internet that i built cuz i love the web a completely normal and totally reasonable amount (no i am not normal). expect lots of computer nonsense, or let me drag you into my fav web serial stuffs, tokusatsu chaos, pokémon, hoyoverse games (i play other games too dw), anime, weirdly specific brainrot interests, and whatever game has currently kidnapped my soul. i collect stuffs, make stuffs, and sometimes ramble about things nobody asked for. basically this site is just all the loose screws rattling around in my head. anyway you're here now so go poke around!!",
     'This is where I keep journal entries, ideas, favorite finds, and small creative experiments. I get a little carried away talking about the things I love.',
   ],
   affiliations: [],

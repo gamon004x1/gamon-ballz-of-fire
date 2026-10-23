@@ -250,9 +250,9 @@ export function validateHomepageForm(
   if (
     aboutParagraphs.length < 1 ||
     aboutParagraphs.length > 4 ||
-    aboutParagraphs.some((paragraph) => paragraph.length > 500)
+    aboutParagraphs.some((paragraph) => paragraph.length > 1000)
   ) {
-    errors.push('Add 1–4 About paragraphs, up to 500 characters each.');
+    errors.push('Add 1–4 About paragraphs, up to 1,000 characters each.');
   }
   if (
     aboutMetadata.length > 6 ||

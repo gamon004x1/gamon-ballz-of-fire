@@ -304,7 +304,7 @@ function homepage(s: Row, id: string): boolean {
     words(s.heroRoles, 6, 80, 1) &&
     text(s.portrait, 2048) &&
     (s.portrait === '' || localImage(s.portrait) || https(s.portrait)) &&
-    words(s.aboutParagraphs, 4, 500, 1) &&
+    words(s.aboutParagraphs, 4, 1000, 1) &&
     list(
       s.aboutMetadata,
       6,
